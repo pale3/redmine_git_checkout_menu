@@ -1,0 +1,104 @@
+<% if @repository.present? && @repository.url.present? %>
+  <%
+    # I stripped /var as this is real path location not accesable by server. Maybe we should introduce config here!
+    repo_path = @repository.url.sub(/^\/var/, '')
+
+    # determine the current protocol and host, probably X-Forwarded stuff wont be catched here, IDK
+    protocol = request.ssl? ? 'https' : 'http'
+    host = request.host_with_port
+    default_branch = @repository.default_branch || 'HEAD'
+
+    # construct the full accesable URL
+    full_url = "#{protocol}://#{host}#{repo_path}"
+  %>
+<% else %>
+  <p>No repository configured for this project.</p>
+<% end %>
+
+<script>
+
+  document.addEventListener('DOMContentLoaded', function () {
+
+  // .contextual is div of default redmine elements in Repository tab where statisctics, branch, revision and located,
+  // we will use this xpath to prepend our button
+  const contextualDiv = document.querySelector('.contextual');
+
+  if (contextualDiv) {
+
+    const cloneDropdownHTML = `
+      <div class="clone-dropdown">
+        <button class="clone-btn" onclick="toggleDropdown()">
+          Clone
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" style="margin-left: 8px; vertical-align: middle;">
+            <path d="M8 11.5a.5.5 0 0 1-.354-.146l-5-5a.5.5 0 1 1 .708-.708L8 10.293l4.646-4.647a.5.5 0 0 1 .708.708l-5 5A.5.5 0 0 1 8 11.5z"/>
+          </svg>
+        </button>
+
+        <div class="clone-dropdown-menu" id="clone-dropdown-menu" style="display: none;">
+          <div class="clone-option">
+            <p>Clone with HTTPS:</p>
+            <div class="repository-url-inline">
+              <input type="text" readonly class="repository-url-input" value="<%= full_url %>" >
+              <button class="repository-url-copy-btn-inline" onclick="copyToClipboard()">
+                <svg aria-hidden="true" focusable="false" class="octicon octicon-copy" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" style="margin-right: 4px; vertical-align: middle;">
+                  <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path>
+                  <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+          <hr>
+          <div class="clone-option">
+            <a href="<%= custom_repository_download_path(@project.id, branch: default_branch, repo_path: repo_path) %>" class="repository-download-btn">
+<svg aria-hidden="true" focusable="false" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" style="display: inline-block; user-select: none; vertical-align: text-bottom; overflow: visible;"><path d="M3.5 1.75v11.5c0 .09.048.173.126.217a.75.75 0 0 1-.752 1.298A1.748 1.748 0 0 1 2 13.25V1.75C2 .784 2.784 0 3.75 0h5.586c.464 0 .909.185 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 12.25 15h-.5a.75.75 0 0 1 0-1.5h.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177L9.513 1.573a.25.25 0 0 0-.177-.073H7.25a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5h-3a.25.25 0 0 0-.25.25Zm3.75 8.75h.5c.966 0 1.75.784 1.75 1.75v3a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1-.75-.75v-3c0-.966.784-1.75 1.75-1.75ZM6 5.25a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 6 5.25Zm.75 2.25h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM8 6.75A.75.75 0 0 1 8.75 6h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 8 6.75ZM8.75 3h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM8 9.75A.75.75 0 0 1 8.75 9h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 8 9.75Zm-1 2.5v2.25h1v-2.25a.25.25 0 0 0-.25-.25h-.5a.25.25 0 0 0-.25.25Z"></path></svg>
+
+              Download Archive
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // lets append the dropdown to the contextual div
+    contextualDiv.insertAdjacentHTML('afterbegin', cloneDropdownHTML);
+  }
+
+  // hide dropdown when we click outside of menu
+  window.toggleDropdown = function () {
+    const dropdownMenu = document.getElementById('clone-dropdown-menu');
+    dropdownMenu.style.display = dropdownMenu.style.display === 'none' ? 'block' : 'none';
+  };
+
+  // copy repository URL to clipboard
+  window.copyToClipboard = function () {
+    const input = document.querySelector('.repository-url-input');
+    input.select();
+    document.execCommand('copy');
+
+    // show feedback with a checkmark
+    const copyButton = document.querySelector('.repository-url-copy-btn-inline');
+    const originalContent = copyButton.innerHTML;
+    copyButton.innerHTML = `
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" style="margin-right: 4px; vertical-align: middle;">
+        <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7.5 7.5a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L6 10.293l7.146-7.147a.5.5 0 0 1 .708 0z"/>
+      </svg>
+      Copied!
+    `; // checkmark icon
+
+    // revert to original content after 2secs
+    setTimeout(() => {
+      copyButton.innerHTML = originalContent;
+    }, 2000);
+  };
+
+  // hide dropdown menu when clicking outside
+  document.addEventListener('click', function (event) {
+    const dropdownMenu = document.getElementById('clone-dropdown-menu');
+    if (!event.target.closest('.clone-btn') && !event.target.closest('.clone-dropdown-menu')) {
+      dropdownMenu.style.display = 'none';
+    }
+  });
+});
+
+</script>
